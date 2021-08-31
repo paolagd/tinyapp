@@ -60,6 +60,15 @@ app.post("/urls/:shortURL/delete", (req, res) => {
 
 });
 
+//Update URL
+app.post("/urls/:shortURL", (req, res) => {
+  const shortURL = req.params.shortURL; 
+  const longURL = req.body.longURL;  
+  urlDatabase[shortURL] = longURL;
+  res.redirect(`/urls/`);
+
+});
+
 /// Redirect URLs 
 app.get("/u/:shortURL", (req, res) => {
 
@@ -69,6 +78,12 @@ app.get("/u/:shortURL", (req, res) => {
   }
   res.redirect(longURL);
 });
+
+
+/**
+ * This portion of the assignment requires changes on the client and the server. Once the user submits an Update request, it should modify the corresponding longURL, and then redirect the client back to "/urls".
+ */
+
 
 app.listen(PORT, () => {
   console.log(`Example app listening on port ${PORT}!`);
