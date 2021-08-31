@@ -1,13 +1,16 @@
 const express = require("express");
 const app = express();
 const bodyParser = require("body-parser");
+const cookieParser = require('cookie-parser');
 
 app.use(bodyParser.urlencoded({ extended: true }));
 
 const PORT = 8080; // default port 8080
 
 app.set("view engine", "ejs");
- 
+
+app.use(cookieParser())
+
 const generateRandomString = () => {
   const characters = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
   let randomString = '';
@@ -26,20 +29,31 @@ const urlDatabase = {
 
 //       ROUTES
 
+
+/// URL Routes
+
 //Lists all the URLs
 app.get("/urls", (req, res) => {
-  const templateVars = { urls: urlDatabase };
+  const templateVars = {
+    urls: urlDatabase,
+    username: req.cookies["username"]
+  };
   res.render('urls_index', templateVars);
 });
 
 //Renders page to create new URL
 app.get("/urls/new", (req, res) => {
-  res.render("urls_new");
+  const templateVars = { username: req.cookies["username"] };
+  res.render("urls_new", templateVars);
 });
 
 //Search for url by ShortURL (key)
 app.get("/urls/:shortURL", (req, res) => {
-  const templateVars = { shortURL: req.params.shortURL, longURL: urlDatabase[req.params.shortURL] };
+  const templateVars = {
+    shortURL: req.params.shortURL,
+    longURL: urlDatabase[req.params.shortURL],
+    username: req.cookies["username"]
+  };
   res.render("urls_show", templateVars);
 });
 
@@ -54,16 +68,16 @@ app.post("/urls", (req, res) => {
 
 //Delete URL
 app.post("/urls/:shortURL/delete", (req, res) => {
-  const shortURL = req.params.shortURL;  
-  delete urlDatabase[shortURL]; 
+  const shortURL = req.params.shortURL;
+  delete urlDatabase[shortURL];
   res.redirect(`/urls/`);
 
 });
 
 //Update URL
 app.post("/urls/:shortURL", (req, res) => {
-  const shortURL = req.params.shortURL; 
-  const longURL = req.body.longURL;  
+  const shortURL = req.params.shortURL;
+  const longURL = req.body.longURL;
   urlDatabase[shortURL] = longURL;
   res.redirect(`/urls/`);
 
@@ -71,19 +85,27 @@ app.post("/urls/:shortURL", (req, res) => {
 
 /// Redirect URLs 
 app.get("/u/:shortURL", (req, res) => {
-
   const longURL = urlDatabase[req.params.shortURL];
-  if (!longURL){
+  if (!longURL) {
     res.status(404).send({ error: 'Short URL not found!' })
   }
   res.redirect(longURL);
 });
 
+/// User Routes
 
-/**
- * This portion of the assignment requires changes on the client and the server. Once the user submits an Update request, it should modify the corresponding longURL, and then redirect the client back to "/urls".
- */
+//LOGIN
+app.post("/login", (req, res) => {
+  const username = req.body.username;
+  res.cookie('username', username);
+  res.redirect(`/urls/`);
+});
 
+//LOGIN
+app.post("/logout", (req, res) => {
+  res.clearCookie('username')
+  res.redirect(`/urls/`);
+});
 
 app.listen(PORT, () => {
   console.log(`Example app listening on port ${PORT}!`);
