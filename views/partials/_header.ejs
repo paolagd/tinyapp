@@ -9,21 +9,21 @@
       <div class="navbar-nav">
         <a class="nav-item nav-link" href="/urls">My URLs</a>
         <a class="nav-item nav-link" href="/urls/new">Create New URL</a>
-        <% if(!user){ %>
-          <form class="form-inline my-2 my-lg-0" action="/login" method="POST">
-            <input class="form-control  mr-sm-2" type="text" placeholder="Username" name="username"
-              style="margin-right: 10px">
-              <button class="btn btn-light my-2 my-sm-0" type="submit">SIGN IN! (for now)</button>
+        <% if(!user){ %> 
+          <form class="form-inline my-2 my-lg-0" action="/login" method="GET"> 
+            <button class="btn btn-light my-2 my-sm-0" type="submit">LOG IN</button>
+          </form> 
+          <form class="form-inline my-2 my-lg-0" style="margin-left: 10px;" action="/register" method="GET"> 
+            <button class="btn btn-light my-2 my-sm-0" type="submit">REGISTER</button>
           </form>
-          <% } else{ %>
-            <h3 class="nav-item">
-              Logged in as : <%= user.email %>
-            </h3> 
-
-            <form class="form-inline my-2 my-lg-0" action="/logout" method="POST"> 
-              <button class="btn btn-light my-2 my-sm-0" type="submit">LOG OUT</button>
-            </form>
-            <% } %>
+        <% } else{ %>
+          <h3 class="nav-item">
+            Logged in as : <%= user.email %>
+          </h3> 
+          <form class="form-inline my-2 my-lg-0" action="/logout" method="POST"> 
+            <button class="btn btn-light my-2 my-sm-0" type="submit">LOG OUT</button>
+          </form>
+        <% } %>
       </div>
     </div>
   </nav>
