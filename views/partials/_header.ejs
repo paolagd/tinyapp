@@ -9,7 +9,7 @@
       <div class="navbar-nav">
         <a class="nav-item nav-link" href="/urls">My URLs</a>
         <a class="nav-item nav-link" href="/urls/new">Create New URL</a>
-        <% if(!username){ %>
+        <% if(!user){ %>
           <form class="form-inline my-2 my-lg-0" action="/login" method="POST">
             <input class="form-control  mr-sm-2" type="text" placeholder="Username" name="username"
               style="margin-right: 10px">
@@ -17,7 +17,7 @@
           </form>
           <% } else{ %>
             <h3 class="nav-item">
-              Logged in as : <%= username %>
+              Logged in as : <%= user.email %>
             </h3> 
 
             <form class="form-inline my-2 my-lg-0" action="/logout" method="POST"> 
