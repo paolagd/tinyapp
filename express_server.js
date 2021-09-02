@@ -1,13 +1,20 @@
 const express = require("express");
 const app = express();
-const bodyParser = require("body-parser");
-const cookieParser = require('cookie-parser');
+const bodyParser = require("body-parser"); 
+const cookieSession = require('cookie-session');
+const getUserByEmail = require('./helpers').getUserByEmail; 
+
 const PORT = 8080; // default port 8080
-var bcrypt = require('bcryptjs');
+const bcrypt = require('bcryptjs');
 
 app.use(bodyParser.urlencoded({ extended: true }));
 app.set("view engine", "ejs");
-app.use(cookieParser());
+
+app.use(cookieSession({
+  name: 'session',
+  keys: ['thisismysecretkey'], 
+  maxAge: 24 * 60 * 60 * 1000  
+}))
 
 //      DATABASES
 
@@ -47,12 +54,7 @@ const usersDatabase = {
 const generateRandomString = function () {
   return Math.random().toString(36).substr(2, 6);
 }
-
-const findUserByEmail = function (usersDB, email) {
-  //Search in the users db for: 
-  return usersDB[Object.keys(usersDB).find(element => email === usersDB[element].email)];
-}
-
+  
 //Returns the URLS created by a specific user
 const urlsForUser = function (urlDB, userID) {
   let userURLs = {};
@@ -67,7 +69,7 @@ const urlsForUser = function (urlDB, userID) {
 
 // Review if the user's password is the same as the password provided
 const authenticateUser = function (userDB, email, password) {
-  const user = findUserByEmail(userDB, email); 
+  const user = getUserByEmail(userDB, email); 
   const hashedPassword = user.password;
   if (user && bcrypt.compareSync(password, hashedPassword)) {
     return user;
@@ -88,8 +90,8 @@ const hashPassword = function(password){
 
 //Lists all the URLs
 app.get("/urls", (req, res) => {
-  const user = usersDatabase[req.cookies["user_id"]];
-  const urls = urlsForUser(urlDatabase, req.cookies["user_id"]);
+  const user = usersDatabase[req.session.user_id];
+  const urls = urlsForUser(urlDatabase, req.session.user_id);
 
   const templateVars = {
     urls,
@@ -100,7 +102,7 @@ app.get("/urls", (req, res) => {
 
 //Renders page to create new URL
 app.get("/urls/new", (req, res) => {
-  const user = usersDatabase[req.cookies["user_id"]];
+  const user = usersDatabase[req.session.user_id];
   if (!user) {
     return res.redirect(`/urls`);
   }
@@ -112,7 +114,7 @@ app.get("/urls/new", (req, res) => {
 
 //Search for url by ShortURL (key)
 app.get("/urls/:shortURL", (req, res) => {
-  const user = usersDatabase[req.cookies["user_id"]];
+  const user = usersDatabase[req.session.user_id];
   const templateVars = {
     shortURL: req.params.shortURL,
     longURL: urlDatabase[req.params.shortURL].longURL,
@@ -123,7 +125,7 @@ app.get("/urls/:shortURL", (req, res) => {
 
 //Create new URL record and saves it in the DB
 app.post("/urls", (req, res) => {
-  const user = usersDatabase[req.cookies["user_id"]];
+  const user = usersDatabase[req.session.user_id];
   if (!user) {
     return res.redirect(`/urls`);
   }
@@ -142,7 +144,7 @@ app.post("/urls", (req, res) => {
 
 //Delete URL
 app.post("/urls/:shortURL/delete", (req, res) => {
-  const user = usersDatabase[req.cookies["user_id"]];
+  const user = usersDatabase[req.session.user_id];
   const shortURL = req.params.shortURL;
 
   if (!user || urlDatabase[shortURL].userID !== user.id) {
@@ -157,16 +159,19 @@ app.post("/urls/:shortURL/delete", (req, res) => {
 
 //Update URL
 app.post("/urls/:shortURL", (req, res) => {
-  const user = usersDatabase[req.cookies["user_id"]];
+  const user = usersDatabase[req.session.user_id];
   const shortURL = req.params.shortURL;
   const longURL = req.body.longURL;
-
+ 
   if (!user || urlDatabase[shortURL].userID !== user.id) {
     res.statusCode = 401;
     return res.send({ error: 'Unauthorized action' });
   }
 
-  urlDatabase[shortURL].longURL = longURL;
+  //If the new URL is empty then the old one is not modified
+  if (longURL) { 
+    urlDatabase[shortURL].longURL = longURL;
+  } 
   res.redirect(`/urls`);
 
 });
@@ -184,7 +189,7 @@ app.get("/u/:shortURL", (req, res) => {
 
 //LOGIN page render
 app.get("/login", (req, res) => {
-  const user = usersDatabase[req.cookies["user_id"]];
+  const user = usersDatabase[req.session.user_id];
   if (user) {
     return res.redirect(`/urls`);
   }
@@ -206,8 +211,9 @@ app.post("/login", (req, res) => {
 
   const authenticatedUser = authenticateUser(usersDatabase, email, password);
 
+  console.log(usersDatabase)
   if (authenticatedUser) {
-    res.cookie('user_id', authenticatedUser.id);
+    req.session.user_id = authenticatedUser.id;
     res.redirect(`/urls`);
   } else {
     res.statusCode = 403;
@@ -217,13 +223,13 @@ app.post("/login", (req, res) => {
 
 //LOGOUT
 app.post("/logout", (req, res) => {
-  res.clearCookie('user_id');
+  req.session = null;
   res.redirect(`/urls`);
 });
 
 //REGISTER page render
 app.get("/register", (req, res) => {
-  const user = usersDatabase[req.cookies["user_id"]];
+  const user = usersDatabase[req.session.user_id];
   if (user) {
     return res.redirect(`/urls`);
   }
@@ -243,14 +249,14 @@ app.post("/register", (req, res) => {
     return res.send({ error: 'Please provide email and password.' });
   }
 
-  const userExists = findUserByEmail(usersDatabase, email);
+  const userExists = getUserByEmail(usersDatabase, email);
 
   if (userExists) {
     res.statusCode = 400;
     return res.send({ error: 'Invalid credentials.' });
   }
 
-  const user_id = generateRandomString(); 
+  const user_id = generateRandomString();  
   const hashedPassword = hashPassword(password); 
 
   const newUser = {
@@ -259,10 +265,9 @@ app.post("/register", (req, res) => {
     password: hashedPassword
   }
 
-  usersDatabase[user_id] = newUser;
-
   console.log(usersDatabase)
-  res.cookie('user_id', user_id);
+  usersDatabase[user_id] = newUser; 
+  req.session.user_id = user_id;
   res.redirect(`/urls`);
 });
 
@@ -271,6 +276,7 @@ app.get("/", (req, res) => {
   res.redirect(`/urls`);
 });
 
+ 
 
 app.listen(PORT, () => {
   console.log(`Example app listening on port ${PORT}!`);
