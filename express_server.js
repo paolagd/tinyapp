@@ -2,13 +2,11 @@ const express = require("express");
 const app = express();
 const bodyParser = require("body-parser");
 const cookieParser = require('cookie-parser');
+const PORT = 8080; // default port 8080
+var bcrypt = require('bcryptjs');
 
 app.use(bodyParser.urlencoded({ extended: true }));
-
-const PORT = 8080; // default port 8080
-
 app.set("view engine", "ejs");
-
 app.use(cookieParser());
 
 //      DATABASES
@@ -35,16 +33,16 @@ const usersDatabase = {
   "userRandomID": {
     id: "userRandomID",
     email: "pacri14@gmail.com",
-    password: "1"
+    password: "$2a$10$9jP.NH8H.cmHyK/rf7hAL.ssljfamPHq9r1wR7tSpilcFASXnKDGy"
   },
   "user2RandomID": {
     id: "user2RandomID",
     email: "user2@example.com",
-    password: "dishwasher-funk"
+    password: "$2a$10$9jP.NH8H.cmHyK/rf7hAL.ssljfamPHq9r1wR7tSpilcFASXnKDGy"
   }
 }
 
-//    MISC FUNCTIONS
+//    HELPER FUNCTIONS
 
 const generateRandomString = function () {
   return Math.random().toString(36).substr(2, 6);
@@ -69,12 +67,20 @@ const urlsForUser = function (urlDB, userID) {
 
 // Review if the user's password is the same as the password provided
 const authenticateUser = function (userDB, email, password) {
-  const user = findUserByEmail(userDB, email);
-  if (user && user.password === password) {
+  const user = findUserByEmail(userDB, email); 
+  const hashedPassword = user.password;
+  if (user && bcrypt.compareSync(password, hashedPassword)) {
     return user;
   }
   return false;
 }
+
+//Hashes password
+const hashPassword = function(password){
+  let salt = bcrypt.genSaltSync(10); 
+  const hashedPassword = bcrypt.hashSync(password, salt); 
+  return hashedPassword;
+} 
 
 //       ROUTES
 
@@ -244,15 +250,18 @@ app.post("/register", (req, res) => {
     return res.send({ error: 'Invalid credentials.' });
   }
 
-  const user_id = generateRandomString();
+  const user_id = generateRandomString(); 
+  const hashedPassword = hashPassword(password); 
 
   const newUser = {
     id: user_id,
     email,
-    password
+    password: hashedPassword
   }
 
   usersDatabase[user_id] = newUser;
+
+  console.log(usersDatabase)
   res.cookie('user_id', user_id);
   res.redirect(`/urls`);
 });
