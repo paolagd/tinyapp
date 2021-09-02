@@ -16,44 +16,47 @@
 
 <body>
   <main style="margin: 1em;">
-
-    <% if(!user){ %> 
-      <h3>Please register or log into your account in order to see your URLs</h3>
-    <%} else {%>
-      <h3>My URLs</h3>
-      <table class="table">
-        <thead>
-          <tr>
-            <th scope="col">Short URL</th>
-            <th scope="col">Long URL</th>
-            <th scope="col">Delete</th>
-            <th scope="col">Edit</th>
-          </tr>
-        </thead>
-        <tbody>
-          <% for(let url in urls) { %>
+    <div class="container">
+      <% if(!user){ %> 
+        <div class="alert alert-danger" role="alert">
+          Please register or log into your account in order to see your URLs
+        </div> 
+      <%} else {%>
+        <h3>My URLs</h3>
+        <table class="table">
+          <thead>
             <tr>
-              <td>
-                <%= url %>
-              </td>
-              <td>
-                <%= urls[url].longURL %>
-              </td>
-              <td>
-                <form method="POST" action="/urls/<%= url %>/delete">
-                  <button type="submit" class="btn btn-danger">Delete</button>
-                </form>
-              </td>
-              <td>
-                <form method="GET" action="/urls/<%= url %>">
-                  <button type="submit" class="btn btn-primary">Edit</button>
-                </form>
-              </td>
+              <th scope="col">Short URL</th>
+              <th scope="col">Long URL</th>
+              <th scope="col">Delete</th>
+              <th scope="col">Edit</th>
             </tr>
-            <% } %>
-        </tbody>
-      </table>
-    <% } %>
+          </thead>
+          <tbody>
+            <% for(let url in urls) { %>
+              <tr>
+                <td>
+                  <%= url %>
+                </td>
+                <td>
+                  <%= urls[url].longURL %>
+                </td>
+                <td>
+                  <form method="POST" action="/urls/<%= url %>/delete">
+                    <button type="submit" class="btn btn-danger">Delete</button>
+                  </form>
+                </td>
+                <td>
+                  <form method="GET" action="/urls/<%= url %>">
+                    <button type="submit" class="btn btn-primary">Edit</button>
+                  </form>
+                </td>
+              </tr>
+              <% } %>
+          </tbody>
+        </table>
+      <% } %>
+    </div>
   </main>
   <!-- Bootstrap JS -->
   <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"
