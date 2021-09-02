@@ -15,16 +15,27 @@ app.use(cookieParser());
 
 // URL databases to keep track of the URLs and their shortened form
 const urlDatabase = {
-  "b2xVn2": "http://www.lighthouselabs.ca",
-  "9sm5xK": "http://www.google.com"
+  b6UTxQ: {
+    longURL: "https://www.tsn.ca",
+    userID: "userRandomID"
+  },
+  i3BoGr: {
+    longURL: "https://www.google.ca",
+    userID: "userRandomID"
+  },
+  i3Bodr: {
+    longURL: "https://www.googlasdasde.ca",
+    userID: "user2RandomID"
+  }
 };
+ 
 
 // Users DB
 const usersDatabase = {
   "userRandomID": {
     id: "userRandomID",
-    email: "user@example.com",
-    password: "purple-monkey-dinosaur"
+    email: "pacri14@gmail.com",
+    password: "1"
   },
   "user2RandomID": {
     id: "user2RandomID",
@@ -44,15 +55,26 @@ const findUserByEmail = function (usersDB, email) {
   return usersDB[Object.keys(usersDB).find(element => email === usersDB[element].email)];
 }
 
+//Returns the URLS created by a specific user
+const urlsForUser = function (urlDB, userID) {
+  let userURLs = {};
+
+  for (const url in urlDB) {
+    if (urlDB[url].userID === userID) {
+      userURLs[url] = urlDB[url]
+    }
+  }
+  return userURLs;
+}
+
 // Review if the user's password is the same as the password provided
-const authenticateUser = function(userDB, email, password){
-  const user = findUserByEmail(userDB, email); 
-  if (user && user.password === password) { 
-    return user; 
+const authenticateUser = function (userDB, email, password) {
+  const user = findUserByEmail(userDB, email);
+  if (user && user.password === password) {
+    return user;
   }
   return false;
 }
- 
 
 //       ROUTES
 
@@ -61,8 +83,10 @@ const authenticateUser = function(userDB, email, password){
 //Lists all the URLs
 app.get("/urls", (req, res) => {
   const user = usersDatabase[req.cookies["user_id"]];
+  const urls = urlsForUser(urlDatabase, req.cookies["user_id"]);
+
   const templateVars = {
-    urls: urlDatabase,
+    urls,
     user
   };
   res.render('urls_index', templateVars);
@@ -71,6 +95,9 @@ app.get("/urls", (req, res) => {
 //Renders page to create new URL
 app.get("/urls/new", (req, res) => {
   const user = usersDatabase[req.cookies["user_id"]];
+  if (!user) {
+    return res.redirect(`/urls`);
+  }
   const templateVars = {
     user
   };
@@ -82,7 +109,7 @@ app.get("/urls/:shortURL", (req, res) => {
   const user = usersDatabase[req.cookies["user_id"]];
   const templateVars = {
     shortURL: req.params.shortURL,
-    longURL: urlDatabase[req.params.shortURL],
+    longURL: urlDatabase[req.params.shortURL].longURL,
     user
   };
   res.render("urls_show", templateVars);
@@ -90,16 +117,33 @@ app.get("/urls/:shortURL", (req, res) => {
 
 //Create new URL record and saves it in the DB
 app.post("/urls", (req, res) => {
+  const user = usersDatabase[req.cookies["user_id"]];
+  if (!user) {
+    return res.redirect(`/urls`);
+  }
   const shortURL = generateRandomString();
   const longURL = req.body.longURL;
-  urlDatabase[shortURL] = longURL;
+  const userID = user.id;
+  urlDatabase[shortURL] = {
+    longURL,
+    userID
+  };
+
+  console.log(urlDatabase)
   res.redirect(`/urls/${shortURL}`);
 
 });
 
 //Delete URL
 app.post("/urls/:shortURL/delete", (req, res) => {
+  const user = usersDatabase[req.cookies["user_id"]];
   const shortURL = req.params.shortURL;
+
+  if (!user || urlDatabase[shortURL].userID !== user.id) {
+    res.statusCode = 401;
+    return res.send({ error: 'Unauthorized action' });
+  }
+
   delete urlDatabase[shortURL];
   res.redirect(`/urls`);
 
@@ -107,20 +151,27 @@ app.post("/urls/:shortURL/delete", (req, res) => {
 
 //Update URL
 app.post("/urls/:shortURL", (req, res) => {
+  const user = usersDatabase[req.cookies["user_id"]];
   const shortURL = req.params.shortURL;
   const longURL = req.body.longURL;
-  urlDatabase[shortURL] = longURL;
+
+  if (!user || urlDatabase[shortURL].userID !== user.id) {
+    res.statusCode = 401;
+    return res.send({ error: 'Unauthorized action' });
+  }
+
+  urlDatabase[shortURL].longURL = longURL;
   res.redirect(`/urls`);
 
 });
 
 /// Redirect URLs 
 app.get("/u/:shortURL", (req, res) => {
-  const longURL = urlDatabase[req.params.shortURL];
-  if (!longURL) {
+  const url = urlDatabase[req.params.shortURL];
+  if (!url) {
     res.status(404).send({ error: 'Short URL not found!' });
   }
-  res.redirect(longURL);
+  res.redirect(url.longURL);
 });
 
 /// User Routes
@@ -128,6 +179,9 @@ app.get("/u/:shortURL", (req, res) => {
 //LOGIN page render
 app.get("/login", (req, res) => {
   const user = usersDatabase[req.cookies["user_id"]];
+  if (user) {
+    return res.redirect(`/urls`);
+  }
   const templateVars = {
     user
   };
@@ -145,11 +199,11 @@ app.post("/login", (req, res) => {
   }
 
   const authenticatedUser = authenticateUser(usersDatabase, email, password);
-  
+
   if (authenticatedUser) {
-      res.cookie('user_id', authenticatedUser.id);
-      res.redirect(`/urls`);
-  }else{ 
+    res.cookie('user_id', authenticatedUser.id);
+    res.redirect(`/urls`);
+  } else {
     res.statusCode = 403;
     res.send({ error: 'Invalid credentials.' });
   }
@@ -164,6 +218,9 @@ app.post("/logout", (req, res) => {
 //REGISTER page render
 app.get("/register", (req, res) => {
   const user = usersDatabase[req.cookies["user_id"]];
+  if (user) {
+    return res.redirect(`/urls`);
+  }
   const templateVars = {
     user
   };
@@ -197,6 +254,11 @@ app.post("/register", (req, res) => {
 
   usersDatabase[user_id] = newUser;
   res.cookie('user_id', user_id);
+  res.redirect(`/urls`);
+});
+
+
+app.get("/", (req, res) => {
   res.redirect(`/urls`);
 });
 
