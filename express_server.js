@@ -2,10 +2,9 @@ const express = require("express");
 const app = express();
 const bodyParser = require("body-parser");
 const cookieSession = require('cookie-session');
-const getUserByEmail = require('./helpers').getUserByEmail;
+const { getUserByEmail, generateRandomString, getUrlsByUser, authenticateUser, hashPassword } = require('./helpers/helpers');
 
-const PORT = 8080;
-const bcrypt = require('bcryptjs');
+const PORT = 8080; 
 
 app.use(bodyParser.urlencoded({ extended: true }));
 app.set("view engine", "ejs");
@@ -48,48 +47,7 @@ const usersDatabase = {
     password: "$2a$10$9jP.NH8H.cmHyK/rf7hAL.ssljfamPHq9r1wR7tSpilcFASXnKDGy"
   }
 }
-
-//    HELPER FUNCTIONS
-
-const generateRandomString = function () {
-  return Math.random().toString(36).substr(2, 6);
-}
-
-//Returns the URLS created by a specific user
-const getUrlsByUser = function (urlDB, userID) {
-  let userURLs = {};
-
-  for (const url in urlDB) {
-    if (urlDB[url].userID === userID) {
-      userURLs[url] = urlDB[url];
-    }
-  }
-  return userURLs;
-}
-
-// Review if the user's password is the same as the password provided
-const authenticateUser = function (userDB, email, password) {
-  const user = getUserByEmail(userDB, email);
-
-  if (!user) {
-    return false;
-  }
-
-  const hashedPassword = user.password;
-
-  if (bcrypt.compareSync(password, hashedPassword)) {
-    return user;
-  }
-  return false;
-}
-
-//Hashes password
-const hashPassword = function (password) {
-  let salt = bcrypt.genSaltSync(10);
-  const hashedPassword = bcrypt.hashSync(password, salt);
-  return hashedPassword;
-}
-
+ 
 //       ROUTES
 
 /// URL Routes
@@ -121,10 +79,10 @@ app.get("/urls/new", (req, res) => {
 
 //Search for url by ShortURL (key)
 app.get("/urls/:shortURL", (req, res) => {
-  const user = usersDatabase[req.session.user_id];
-  const urlRecord = urlDatabase[req.params.shortURL];
+  const user = usersDatabase[req.session.user_id]; 
+  const urlRecord = urlDatabase[req.params.shortURL]; 
 
-  if (!user || urlDatabase[shortURL].userID !== user.id) {
+  if (!user || urlRecord.userID !== user.id) {
     res.statusCode = 401;
     return res.send({ error: 'Unauthorized action' });
   }
@@ -212,12 +170,16 @@ app.get("/u/:shortURL", (req, res) => {
 //LOGIN page render
 app.get("/login", (req, res) => {
   const user = usersDatabase[req.session.user_id];
+
   if (user) {
     return res.redirect(`/urls`);
   }
+
+  //used by the header
   const templateVars = {
     user
   };
+  
   res.render("login", templateVars);
 });
 
@@ -254,6 +216,8 @@ app.get("/register", (req, res) => {
   if (user) {
     return res.redirect(`/urls`);
   }
+
+  //used by the header
   const templateVars = {
     user
   };
@@ -286,8 +250,9 @@ app.post("/register", (req, res) => {
     email,
     password: hashedPassword
   }
- 
-  usersDatabase[user_id] = newUser;
+
+  //creating new user
+  usersDatabase[user_id] = newUser; 
   req.session.user_id = user_id;
   res.redirect(`/urls`);
 });
