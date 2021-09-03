@@ -262,7 +262,7 @@ app.get("/", (req, res) => {
   const user = usersDatabase[req.session.user_id];
 
   if (user) {
-    return res.redirect(`/urls`);
+    return res.redirect(`/urls`);;
   }
   return res.redirect(`/login`);
 });
