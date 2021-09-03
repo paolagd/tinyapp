@@ -1,10 +1,10 @@
 const express = require("express");
 const app = express();
-const bodyParser = require("body-parser"); 
+const bodyParser = require("body-parser");
 const cookieSession = require('cookie-session');
-const getUserByEmail = require('./helpers').getUserByEmail; 
+const getUserByEmail = require('./helpers').getUserByEmail;
 
-const PORT = 8080; // default port 8080
+const PORT = 8080;
 const bcrypt = require('bcryptjs');
 
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -12,8 +12,8 @@ app.set("view engine", "ejs");
 
 app.use(cookieSession({
   name: 'session',
-  keys: ['thisismysecretkey'], 
-  maxAge: 24 * 60 * 60 * 1000  
+  keys: ['thisismysecretkey'],
+  maxAge: 24 * 60 * 60 * 1000
 }))
 
 //      DATABASES
@@ -33,7 +33,7 @@ const urlDatabase = {
     userID: "user2RandomID"
   }
 };
- 
+
 
 // Users DB
 const usersDatabase = {
@@ -54,14 +54,14 @@ const usersDatabase = {
 const generateRandomString = function () {
   return Math.random().toString(36).substr(2, 6);
 }
-  
+
 //Returns the URLS created by a specific user
-const urlsForUser = function (urlDB, userID) {
+const getUrlsByUser = function (urlDB, userID) {
   let userURLs = {};
 
   for (const url in urlDB) {
     if (urlDB[url].userID === userID) {
-      userURLs[url] = urlDB[url]
+      userURLs[url] = urlDB[url];
     }
   }
   return userURLs;
@@ -69,20 +69,26 @@ const urlsForUser = function (urlDB, userID) {
 
 // Review if the user's password is the same as the password provided
 const authenticateUser = function (userDB, email, password) {
-  const user = getUserByEmail(userDB, email); 
+  const user = getUserByEmail(userDB, email);
+
+  if (!user) {
+    return false;
+  }
+
   const hashedPassword = user.password;
-  if (user && bcrypt.compareSync(password, hashedPassword)) {
+
+  if (bcrypt.compareSync(password, hashedPassword)) {
     return user;
   }
   return false;
 }
 
 //Hashes password
-const hashPassword = function(password){
-  let salt = bcrypt.genSaltSync(10); 
-  const hashedPassword = bcrypt.hashSync(password, salt); 
+const hashPassword = function (password) {
+  let salt = bcrypt.genSaltSync(10);
+  const hashedPassword = bcrypt.hashSync(password, salt);
   return hashedPassword;
-} 
+}
 
 //       ROUTES
 
@@ -91,12 +97,13 @@ const hashPassword = function(password){
 //Lists all the URLs
 app.get("/urls", (req, res) => {
   const user = usersDatabase[req.session.user_id];
-  const urls = urlsForUser(urlDatabase, req.session.user_id);
+  const urls = getUrlsByUser(urlDatabase, req.session.user_id);
 
   const templateVars = {
     urls,
     user
   };
+
   res.render('urls_index', templateVars);
 });
 
@@ -115,20 +122,35 @@ app.get("/urls/new", (req, res) => {
 //Search for url by ShortURL (key)
 app.get("/urls/:shortURL", (req, res) => {
   const user = usersDatabase[req.session.user_id];
+  const urlRecord = urlDatabase[req.params.shortURL];
+
+  if (!user || urlDatabase[shortURL].userID !== user.id) {
+    res.statusCode = 401;
+    return res.send({ error: 'Unauthorized action' });
+  }
+
+  if (!urlRecord) {
+    return res.status(404).send({ error: 'URL not found' });
+  }
+
   const templateVars = {
     shortURL: req.params.shortURL,
-    longURL: urlDatabase[req.params.shortURL].longURL,
+    longURL: urlRecord.longURL,
     user
   };
+
   res.render("urls_show", templateVars);
 });
 
 //Create new URL record and saves it in the DB
 app.post("/urls", (req, res) => {
   const user = usersDatabase[req.session.user_id];
+
   if (!user) {
-    return res.redirect(`/urls`);
+    res.statusCode = 401;
+    return res.send({ error: 'Unauthorized action' });
   }
+
   const shortURL = generateRandomString();
   const longURL = req.body.longURL;
   const userID = user.id;
@@ -137,9 +159,7 @@ app.post("/urls", (req, res) => {
     userID
   };
 
-  console.log(urlDatabase)
   res.redirect(`/urls/${shortURL}`);
-
 });
 
 //Delete URL
@@ -162,16 +182,16 @@ app.post("/urls/:shortURL", (req, res) => {
   const user = usersDatabase[req.session.user_id];
   const shortURL = req.params.shortURL;
   const longURL = req.body.longURL;
- 
+
   if (!user || urlDatabase[shortURL].userID !== user.id) {
     res.statusCode = 401;
     return res.send({ error: 'Unauthorized action' });
   }
 
-  //If the new URL is empty then the old one is not modified
-  if (longURL) { 
+  //Changes are saved only if the longURL is not falsy(empty)
+  if (longURL) {
     urlDatabase[shortURL].longURL = longURL;
-  } 
+  }
   res.redirect(`/urls`);
 
 });
@@ -179,9 +199,11 @@ app.post("/urls/:shortURL", (req, res) => {
 /// Redirect URLs 
 app.get("/u/:shortURL", (req, res) => {
   const url = urlDatabase[req.params.shortURL];
+
   if (!url) {
-    res.status(404).send({ error: 'Short URL not found!' });
+    res.status(404).send({ error: 'URL not found!' });
   }
+
   res.redirect(url.longURL);
 });
 
@@ -211,7 +233,6 @@ app.post("/login", (req, res) => {
 
   const authenticatedUser = authenticateUser(usersDatabase, email, password);
 
-  console.log(usersDatabase)
   if (authenticatedUser) {
     req.session.user_id = authenticatedUser.id;
     res.redirect(`/urls`);
@@ -256,27 +277,30 @@ app.post("/register", (req, res) => {
     return res.send({ error: 'Invalid credentials.' });
   }
 
-  const user_id = generateRandomString();  
-  const hashedPassword = hashPassword(password); 
+  //Generating a new ID and hashing the provided password
+  const user_id = generateRandomString();
+  const hashedPassword = hashPassword(password);
 
   const newUser = {
     id: user_id,
     email,
     password: hashedPassword
   }
-
-  console.log(usersDatabase)
-  usersDatabase[user_id] = newUser; 
+ 
+  usersDatabase[user_id] = newUser;
   req.session.user_id = user_id;
   res.redirect(`/urls`);
 });
 
 
 app.get("/", (req, res) => {
-  res.redirect(`/urls`);
-});
+  const user = usersDatabase[req.session.user_id];
 
- 
+  if (user) {
+    return res.redirect(`/urls`);;
+  }
+  return res.redirect(`/login`);
+});
 
 app.listen(PORT, () => {
   console.log(`Example app listening on port ${PORT}!`);
