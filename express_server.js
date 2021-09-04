@@ -4,7 +4,7 @@ const bodyParser = require("body-parser");
 const cookieSession = require('cookie-session');
 const { getUserByEmail, generateRandomString, getUrlsByUser, authenticateUser, hashPassword } = require('./helpers/helpers');
 
-const PORT = 8080; 
+const PORT = 8080;
 
 app.use(bodyParser.urlencoded({ extended: true }));
 app.set("view engine", "ejs");
@@ -47,7 +47,7 @@ const usersDatabase = {
     password: "$2a$10$9jP.NH8H.cmHyK/rf7hAL.ssljfamPHq9r1wR7tSpilcFASXnKDGy"
   }
 }
- 
+
 //       ROUTES
 
 /// URL Routes
@@ -57,6 +57,10 @@ app.get("/urls", (req, res) => {
   const user = usersDatabase[req.session.user_id];
   const urls = getUrlsByUser(urlDatabase, req.session.user_id);
 
+  if (!user) {  
+    return res.status(401).send(`<html><body><h3 style="color:red">Unauthorized action. Please log in.</h3></body></html>`);
+  }
+  
   const templateVars = {
     urls,
     user
@@ -69,7 +73,7 @@ app.get("/urls", (req, res) => {
 app.get("/urls/new", (req, res) => {
   const user = usersDatabase[req.session.user_id];
   if (!user) {
-    return res.redirect(`/urls`);
+    return res.redirect(`/login`);
   }
   const templateVars = {
     user
@@ -79,16 +83,15 @@ app.get("/urls/new", (req, res) => {
 
 //Search for url by ShortURL (key)
 app.get("/urls/:shortURL", (req, res) => {
-  const user = usersDatabase[req.session.user_id]; 
-  const urlRecord = urlDatabase[req.params.shortURL]; 
+  const user = usersDatabase[req.session.user_id];
+  const urlRecord = urlDatabase[req.params.shortURL];
 
-  if (!user || urlRecord.userID !== user.id) {
-    res.statusCode = 401;
-    return res.send({ error: 'Unauthorized action' });
-  }
-
-  if (!urlRecord) {
-    return res.status(404).send({ error: 'URL not found' });
+  if (!user) {  
+    return res.status(401).send(`<html><body><h3 style="color:red">Unauthorized action. Please log in.</h3></body></html>`);
+  }else if(!urlRecord) { 
+    return res.status(404).send(`<html><body><h3 style="color:red">URL does not exist</h3></body></html>`);
+  }else if(urlRecord.userID !== user.id){ 
+    return res.status(404).send(`<html><body><h3 style="color:red">Unauthorized action. URL cannot be found in your records</h3></body></html>`);
   }
 
   const templateVars = {
@@ -104,9 +107,8 @@ app.get("/urls/:shortURL", (req, res) => {
 app.post("/urls", (req, res) => {
   const user = usersDatabase[req.session.user_id];
 
-  if (!user) {
-    res.statusCode = 401;
-    return res.send({ error: 'Unauthorized action' });
+  if (!user) {  
+    return res.status(401).send(`<html><body><h3 style="color:red">Unauthorized action. Please log in.</h3></body></html>`);
   }
 
   const shortURL = generateRandomString();
@@ -125,9 +127,10 @@ app.post("/urls/:shortURL/delete", (req, res) => {
   const user = usersDatabase[req.session.user_id];
   const shortURL = req.params.shortURL;
 
-  if (!user || urlDatabase[shortURL].userID !== user.id) {
-    res.statusCode = 401;
-    return res.send({ error: 'Unauthorized action' });
+  if (!user) {  
+    return res.status(401).send(`<html><body><h3 style="color:red">Unauthorized action. Please log in.</h3></body></html>`);
+  }else if(urlDatabase[shortURL].userID !== user.id){ 
+    return res.status(404).send(`<html><body><h3 style="color:red">Unauthorized action. URL cannot be found in your records</h3></body></html>`);
   }
 
   delete urlDatabase[shortURL];
@@ -139,13 +142,17 @@ app.post("/urls/:shortURL/delete", (req, res) => {
 app.post("/urls/:shortURL", (req, res) => {
   const user = usersDatabase[req.session.user_id];
   const shortURL = req.params.shortURL;
-  const longURL = req.body.longURL;
+  const longURL = req.body.longURL; 
+  const urlRecord = urlDatabase[shortURL]; 
 
-  if (!user || urlDatabase[shortURL].userID !== user.id) {
-    res.statusCode = 401;
-    return res.send({ error: 'Unauthorized action' });
+  if (!user) {  
+    return res.status(401).send(`<html><body><h3 style="color:red">Unauthorized action. Please log in.</h3></body></html>`);
+  }else if(!urlRecord) { 
+    return res.status(404).send(`<html><body><h3 style="color:red">URL does not exist</h3></body></html>`);
+  }else if(urlRecord.userID !== user.id){ 
+    return res.status(404).send(`<html><body><h3 style="color:red">Unauthorized action. URL cannot be found in your records</h3></body></html>`);
   }
-
+ 
   //Changes are saved only if the longURL is not falsy(empty)
   if (longURL) {
     urlDatabase[shortURL].longURL = longURL;
@@ -158,8 +165,8 @@ app.post("/urls/:shortURL", (req, res) => {
 app.get("/u/:shortURL", (req, res) => {
   const url = urlDatabase[req.params.shortURL];
 
-  if (!url) {
-    res.status(404).send({ error: 'URL not found!' });
+  if (!url) { 
+    return res.status(404).send(`<html><body><h3 style="color:red">URL not found!</h3></body></html>`);
   }
 
   res.redirect(url.longURL);
@@ -179,7 +186,7 @@ app.get("/login", (req, res) => {
   const templateVars = {
     user
   };
-  
+
   res.render("login", templateVars);
 });
 
@@ -188,9 +195,8 @@ app.post("/login", (req, res) => {
 
   const { email, password } = req.body;
 
-  if (!email || !password) {
-    res.statusCode = 400;
-    return res.send({ error: 'Please provide email and password.' });
+  if (!email || !password) { 
+    return res.status(400).send(`<html><body><h3 style="color:red">Please provide email and password.</h3></body></html>`);
   }
 
   const authenticatedUser = authenticateUser(usersDatabase, email, password);
@@ -198,9 +204,8 @@ app.post("/login", (req, res) => {
   if (authenticatedUser) {
     req.session.user_id = authenticatedUser.id;
     res.redirect(`/urls`);
-  } else {
-    res.statusCode = 403;
-    res.send({ error: 'Invalid credentials.' });
+  } else { 
+    return res.status(403).send(`<html><body><h3 style="color:red">Invalid credentials.</h3></body></html>`);
   }
 });
 
@@ -229,16 +234,14 @@ app.post("/register", (req, res) => {
 
   const { email, password } = req.body;
 
-  if (!email || !password) {
-    res.statusCode = 400;
-    return res.send({ error: 'Please provide email and password.' });
+  if (!email || !password) { 
+    return res.status(400).send(`<html><body><h3 style="color:red">Please provide email and password.</h3></body></html>`);
   }
 
   const userExists = getUserByEmail(usersDatabase, email);
 
-  if (userExists) {
-    res.statusCode = 400;
-    return res.send({ error: 'Invalid credentials.' });
+  if (userExists) {  
+    return res.status(400).send(`<html><body><h3 style="color:red">Invalid credentials.</h3></body></html>`);
   }
 
   //Generating a new ID and hashing the provided password
@@ -252,7 +255,7 @@ app.post("/register", (req, res) => {
   }
 
   //creating new user
-  usersDatabase[user_id] = newUser; 
+  usersDatabase[user_id] = newUser;
   req.session.user_id = user_id;
   res.redirect(`/urls`);
 });
